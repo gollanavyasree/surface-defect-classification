@@ -3,10 +3,10 @@ import streamlit as st
 import tensorflow as tf
 import numpy as np
 import cv2
-import pandas as pd
 from PIL import Image
 from datetime import datetime
 
+# ---------------- PAGE SETTINGS ----------------
 st.set_page_config(
     page_title="SteelVision AI",
     page_icon="🔬",
@@ -33,227 +33,243 @@ DISPLAY_NAMES = {
     "rolled-in_scale": "Rolled-in Scale"
 }
 
-COLORS = [
-    "#38BDF8", "#FBBF24", "#34D399",
-    "#A78BFA", "#FB7185", "#22D3EE"
-]
-
+# ---------------- CUSTOM DESIGN ----------------
 st.markdown("""
 <style>
 .stApp {
-    background: linear-gradient(135deg, #071326, #10284b);
-    color: #F1F5F9;
+    background: linear-gradient(135deg, #071426, #102b46);
+    color: white;
 }
 h1, h2, h3, p, label {
-    color: #F1F5F9 !important;
-}
-.hero {
-    padding: 28px;
-    border-radius: 20px;
-    background: linear-gradient(110deg, #263c91, #132d53, #432477);
-    border: 1px solid #4365b0;
-    margin-bottom: 24px;
-}
-.hero h1 {
-    font-size: 38px;
-    margin-bottom: 8px;
-}
-.hero p {
-    color: #D7E5FF !important;
-    margin-bottom: 0;
-}
-.card {
-    background: #102747;
-    padding: 22px;
-    border-radius: 16px;
-    border: 1px solid #28518a;
-    margin-bottom: 16px;
-}
-.result-card {
-    background: linear-gradient(110deg, #087F5B, #065F73);
-    border: 1px solid #34D399;
-    border-radius: 16px;
-    padding: 22px;
-    margin: 12px 0 20px 0;
-}
-.result-label {
-    color: #D1FAE5 !important;
-    font-size: 15px;
-}
-.result-value {
     color: white !important;
-    font-size: 29px;
-    font-weight: 750;
 }
-.small-note {
-    color: #B9CBE5 !important;
-    font-size: 13px;
-}
-div.stButton > button {
-    background: linear-gradient(90deg, #8B5CF6, #06B6D4);
-    color: white;
-    border: none;
+div[data-testid="stMetric"] {
+    background: #163653;
+    padding: 18px;
     border-radius: 12px;
-    padding: 12px;
-    font-weight: 700;
-    min-height: 48px;
 }
-div.stButton > button:hover {
-    border: 1px solid white;
-    color: white;
-}
-div[data-testid="stFileUploader"] {
-    background: #102747;
-    padding: 14px;
-    border-radius: 14px;
-    border: 1px dashed #6388C5;
+.stButton > button {
+    background-color: #00bcd4;
+    color: #071426;
+    border-radius: 10px;
+    border: none;
+    font-weight: bold;
+    width: 100%;
 }
 </style>
 """, unsafe_allow_html=True)
 
+# ---------------- LOAD MODEL ----------------
 @st.cache_resource
 def load_model():
     return tf.keras.models.load_model(MODEL_PATH)
-# Sidebar Menu
+
+# ---------------- SIDEBAR ----------------
 st.sidebar.title("🔬 SteelVision AI")
+st.sidebar.write("Industrial Surface Defect Classification")
 
 page = st.sidebar.radio(
     "Choose a page",
     ["Defect Prediction", "Model Performance"]
 )
-st.markdown("""
-<div class="hero">
-    <h1>🔬 Industrial Surface Defect Classification</h1>
-    <p>SteelVision AI · Intelligent inspection powered by MobileNetV2</p>
-</div>
-""", unsafe_allow_html=True)
 
-st.markdown("### 📤 Upload Steel Surface Image")
-st.write("Choose a clear JPG, JPEG or PNG image to identify its defect.")
+st.sidebar.markdown("---")
+st.sidebar.write("Dataset: NEU Surface Defect Dataset")
+st.sidebar.write("Model: MobileNetV2")
 
-uploaded_file = st.file_uploader(
-    "Choose an image",
-    type=["jpg", "jpeg", "png"],
-    label_visibility="collapsed"
-)
+# ==================================================
+# PAGE 1: DEFECT PREDICTION
+# ==================================================
+if page == "Defect Prediction":
 
-if uploaded_file is not None:
-    image = Image.open(uploaded_file).convert("RGB")
+    st.title("🔬 Industrial Surface Defect Classification")
+    st.write(
+        "Upload a steel surface image to identify possible surface defects "
+        "using our trained deep learning model."
+    )
 
-    left, right = st.columns([1, 1.15], gap="large")
+    uploaded_file = st.file_uploader(
+        "Upload a steel surface image",
+        type=["jpg", "jpeg", "png"]
+    )
 
-    with left:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("### 🖼️ Uploaded Image")
-        st.image(image, use_container_width=True)
-        st.markdown(
-            f'<p class="small-note">{uploaded_file.name}</p>',
-            unsafe_allow_html=True
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
+    if uploaded_file is not None:
 
-        predict_clicked = st.button(
-            "✨ Predict Defect",
-            use_container_width=True
-        )
+        image = Image.open(uploaded_file).convert("RGB")
+        original = np.array(image)
 
-    with right:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("### 🧠 Prediction Results")
+        # Image preprocessing for preview
+        gray = cv2.cvtColor(original, cv2.COLOR_RGB2GRAY)
+        gray = cv2.resize(gray, (128, 128))
+        equalized = cv2.equalizeHist(gray)
+        processed = cv2.GaussianBlur(equalized, (5, 5), 0)
 
-        if predict_clicked:
-            with st.spinner("Analyzing the steel surface..."):
-                img = np.array(image)
-                gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-                gray = cv2.resize(gray, (128, 128))
-                gray = cv2.equalizeHist(gray)
-                gray = cv2.GaussianBlur(gray, (5, 5), 0)
-                gray = gray.astype("float32") / 255.0
+        col1, col2 = st.columns(2)
 
-                rgb = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
-                rgb = cv2.resize(rgb, (224, 224))
-                rgb = rgb * 255.0
-                rgb = tf.keras.applications.mobilenet_v2.preprocess_input(rgb)
-                rgb = np.expand_dims(rgb, axis=0)
+        with col1:
+            st.subheader("📷 Original Image")
+            st.image(image, use_container_width=True)
 
-                model = load_model()
-                scores = model.predict(rgb, verbose=0)[0]
-
-                # Display scores as percentages.
-                # This assumes the model output is six class probabilities.
-                scores = np.asarray(scores, dtype=float)
-                if len(scores) != len(CLASSES):
-                    st.error("The model output does not match the six classes.")
-                    st.stop()
-
-                scores_percent = scores * 100
-                index = int(np.argmax(scores))
-                defect = DISPLAY_NAMES[CLASSES[index]]
-                confidence = float(scores_percent[index])
-
-                st.markdown(f"""
-                <div class="result-card">
-                    <div class="result-label">✅ Predicted Defect</div>
-                    <div class="result-value">{defect}</div>
-                    <br>
-                    <div class="result-label">📊 Model Confidence</div>
-                    <div class="result-value">{confidence:.2f}%</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-                st.markdown("### 🎯 Confidence by Class")
-
-                for i, name in enumerate(CLASSES):
-                    value = float(scores_percent[i])
-                    st.markdown(
-                        f"**{DISPLAY_NAMES[name]}** — {value:.2f}%"
-                    )
-                    st.progress(max(0.0, min(value / 100.0, 1.0)))
-
-                report = (
-                    "Industrial Surface Defect Classification\n"
-                    f"Predicted Defect: {defect}\n"
-                    f"Model Confidence: {confidence:.2f}%\n"
-                    f"Analysis Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-                )
-
-                st.download_button(
-                    "📥 Download Prediction Report",
-                    data=report,
-                    file_name="defect_prediction_report.txt",
-                    mime="text/plain",
-                    use_container_width=True
-                )
-
-                st.caption(
-                    "Confidence is the model's output score, "
-                    "not a guarantee that the prediction is correct."
-                )
-        else:
-            st.info(
-                "Upload an image, then click **Predict Defect** "
-                "to view the results and confidence chart."
+        with col2:
+            st.subheader("⚙️ Processed Image")
+            st.image(
+                processed,
+                caption="Grayscale + Histogram Equalization + Gaussian Blur",
+                use_container_width=True
             )
 
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("---")
 
+        if st.button("🔍 Predict Surface Defect"):
+
+            with st.spinner("Analyzing image... Please wait."):
+
+                # Keep preprocessing consistent with model training
+                normalized = processed.astype("float32") / 255.0
+                rgb = cv2.cvtColor(normalized, cv2.COLOR_GRAY2RGB)
+                rgb = cv2.resize(rgb, (224, 224))
+                rgb = rgb * 255.0
+
+                model_input = tf.keras.applications.mobilenet_v2.preprocess_input(rgb)
+                model_input = np.expand_dims(model_input, axis=0)
+
+                model = load_model()
+                scores = model.predict(model_input, verbose=0)[0]
+
+                # Ensure scores are normalized for displaying percentages
+                scores = np.asarray(scores, dtype=float)
+                if (
+                    np.any(scores < 0)
+                    or np.any(scores > 1)
+                    or not np.isclose(np.sum(scores), 1.0, atol=0.05)
+                ):
+                    scores = tf.nn.softmax(scores).numpy()
+
+                index = int(np.argmax(scores))
+                defect = CLASSES[index]
+                confidence = float(scores[index] * 100)
+
+            st.success("Analysis completed!")
+
+            st.subheader("🎯 Prediction Result")
+            result_col1, result_col2 = st.columns(2)
+
+            with result_col1:
+                st.metric("Predicted Defect", DISPLAY_NAMES[defect])
+
+            with result_col2:
+                st.metric("Model Confidence", f"{confidence:.2f}%")
+
+            st.subheader("📊 Class-wise Confidence")
+
+            for i, class_name in enumerate(CLASSES):
+                percentage = float(scores[i] * 100)
+                st.write(f"**{DISPLAY_NAMES[class_name]}:** {percentage:.2f}%")
+                st.progress(min(1.0, max(0.0, percentage / 100)))
+
+            # Detailed downloadable report
+            report = f"""
+STEELVISION AI
+Industrial Surface Defect Classification
+----------------------------------------
+
+Image: {uploaded_file.name}
+Date and Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+PREDICTION RESULT
+Predicted Defect: {DISPLAY_NAMES[defect]}
+Model: MobileNetV2
+Model Confidence: {confidence:.2f}%
+
+CLASS-WISE CONFIDENCE
+"""
+
+            for i, class_name in enumerate(CLASSES):
+                report += (
+                    f"\n{DISPLAY_NAMES[class_name]}: "
+                    f"{scores[i] * 100:.2f}%"
+                )
+
+            report += """
+
+PREPROCESSING
+1. Convert image to grayscale
+2. Resize to 128 x 128
+3. Apply histogram equalization
+4. Apply Gaussian blur
+5. Normalize pixel values
+6. Resize model input to 224 x 224
+
+Note: This is an AI prediction and should be reviewed
+by a qualified person before making industrial decisions.
+"""
+
+            st.download_button(
+                label="⬇️ Download Detailed Report",
+                data=report,
+                file_name="surface_defect_report.txt",
+                mime="text/plain"
+            )
+
+    else:
+        st.info("Upload a JPG, JPEG, or PNG image to get started.")
+
+# ==================================================
+# PAGE 2: MODEL PERFORMANCE
+# ==================================================
 else:
-    st.markdown("""
-    <div class="card">
-        <h3>✨ What this app can identify</h3>
-        <p>🔹 Crazing &nbsp; 🔹 Inclusion &nbsp; 🔹 Patches</p>
-        <p>🔹 Scratches &nbsp; 🔹 Pitted Surface</p>
-        <p>🔹 Rolled-in Scale</p>
-        <p class="small-note">
-            Upload a steel surface image to begin the analysis.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
 
-st.markdown("---")
-st.markdown(
-    "<p style='text-align:center;color:#B9CBE5'>"
-    "SteelVision AI · Industrial Surface Inspection · MobileNetV2"
-    "</p>",
-    unsafe_allow_html=True
-)
+    st.title("📊 Model Performance Comparison")
+    st.write(
+        "Compare the accuracy of the models evaluated in this project."
+    )
+
+    model_names = ["Baseline CNN", "Improved CNN", "MobileNetV2"]
+    accuracies = [66.94, 69.44, 95.56]
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("Baseline CNN", "66.94%")
+    col2.metric("Improved CNN", "69.44%")
+    col3.metric("MobileNetV2", "95.56%")
+
+    st.subheader("📈 Accuracy Comparison")
+
+    chart_data = {
+        "Model": model_names,
+        "Accuracy (%)": accuracies
+    }
+
+    st.bar_chart(
+        chart_data,
+        x="Model",
+        y="Accuracy (%)",
+        color="#00bcd4"
+    )
+
+    st.subheader("🧠 Project Summary")
+
+    st.write("""
+    - **Baseline CNN:** Initial convolutional neural network model.
+    - **Improved CNN:** Updated CNN model with improved accuracy.
+    - **MobileNetV2:** Transfer learning model with the highest
+      reported test accuracy in this project.
+    """)
+
+    st.info(
+        "Reported MobileNetV2 test accuracy: 95.56% on 360 test images. "
+        "Accuracy comparisons are meaningful when models use the same "
+        "test dataset and evaluation method."
+    )
+
+    st.subheader("🔬 Main Processing Steps")
+
+    st.write("""
+    1. Image upload
+    2. Grayscale conversion
+    3. Histogram equalization
+    4. Gaussian blur
+    5. Image normalization
+    6. MobileNetV2 prediction
+    7. Defect classification and confidence display
+    """)
