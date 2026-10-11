@@ -114,7 +114,13 @@ div[data-testid="stFileUploader"] {
 @st.cache_resource
 def load_model():
     return tf.keras.models.load_model(MODEL_PATH)
+# Sidebar Menu
+st.sidebar.title("🔬 SteelVision AI")
 
+page = st.sidebar.radio(
+    "Choose a page",
+    ["Defect Prediction", "Model Performance"]
+)
 st.markdown("""
 <div class="hero">
     <h1>🔬 Industrial Surface Defect Classification</h1>
